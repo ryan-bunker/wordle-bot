@@ -136,9 +136,12 @@
                 const script = window.editor.getModel().getValue();
                 eval(script);
 
-                let iterations = parseInt($("#iterations").val());
+                ITERATIONS = parseInt($("#iterations").val());
                 let results = [0, 0, 0, 0, 0, 0, 0];
-                for (let game=1; game<=iterations; game++) {
+                for (let game=1; game<=ITERATIONS; game++) {
+                    if (typeof pre_game === 'function')
+                        pre_game(game);
+
                     let attempts = runGame(make_guess);
                     if (attempts == 7) {
                         console.log("Finished: Bot did not guess word correctly.");
@@ -146,10 +149,15 @@
                         console.log("Finished: " + attempts + " / 6");
                     }
                     results[attempts - 1]++;
+
+                    if (typeof post_game === 'function')
+                        post_game(game, attempts);
                 }
 
+                if (typeof post_run === 'function')
+                    post_run(results);
 
-                let format = n => "" + n + " (" + (n * 100 / iterations) + "%)";
+                let format = n => "" + n + " (" + (n * 100 / ITERATIONS) + "%)";
                 console.forceLog("Result breakdown");
                 for (let i=0; i<6; i++) {
                     console.forceLog("" + (i+1) + " / 6 - " + format(results[i]));
