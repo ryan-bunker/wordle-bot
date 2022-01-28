@@ -1,0 +1,157 @@
+<html>
+    <head>
+        <title>Build a Wordle Bot</title>
+        <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+        <script src="https://unpkg.com/monaco-editor@latest/min/vs/loader.js"></script>
+        <script src="words.js"></script>
+        <style>
+            #container {
+                margin-top: 20px;
+                border: 1px solid darkgray;
+                width: 100%;
+                height: 500px;
+            }
+
+            #output {
+                margin-top: 20px;
+                /*min-height: 50px;
+                max-height: 250px;*/
+                height: 250px;
+                overflow-y: auto;
+                word-wrap: break-word;
+                font-family: monospace;
+                border: 1px solid darkgray;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Build a Wordle Bot!</h1>
+        <div>
+            <span>Iterations</span>
+            <input type="text" value="1000" id="iterations" />
+            <input type="submit" value="Run" id="run-game" />
+            <input type="checkbox" id="suppress-log" checked>Suppress console logging</input>
+        </div>
+        <div id="results"></div>
+        <div id="output"></div>
+        <div id="container"></div>
+    </body>
+
+    <script>
+        function runGame(guesser) {
+            const theWord = ALL_WORDS[Math.floor(Math.random() * ALL_WORDS.length)];
+            let result = undefined, guesses = [];
+            console.log("Target word: " + theWord);
+
+            for (let attempt=1; attempt<=6; attempt++) {
+                console.log("Attempt " + attempt + " of 6");
+                const guess = guesser(attempt, guesses, result).toUpperCase();
+                console.log("Guess: " + guess);
+                if (!ALL_WORDS.includes(guess) && !VALID_GUESSES.includes(guess)) {
+                    throw new Error("Guess was not a valid word, asking again");
+                }
+
+                if (theWord === guess) {
+                    console.log("Correct!");
+                    return attempt;
+                }
+
+                result = "";
+                for (let i=0; i<guess.length; i++) {
+                    if (theWord[i] === guess[i]) {
+                        result += "G";
+                    } else if (theWord.includes(guess[i])) {
+                        result += "Y";
+                    } else {
+                        result += ".";
+                    }
+                }
+                console.log("Result: " + result);
+                console.log("----------------------------------");
+                guesses.push(guess);
+            }
+
+            return 7;
+        }
+
+        $(function() {
+            require.config({ paths: { 'vs': 'https://unpkg.com/monaco-editor@latest/min/vs' }});
+            window.MonacoEnvironment = { getWorkerUrl: () => proxy };
+
+            let proxy = URL.createObjectURL(new Blob([`
+                self.MonacoEnvironment = {
+                    baseUrl: 'https://unpkg.com/monaco-editor@latest/min/'
+                };
+                importScripts('https://unpkg.com/monaco-editor@latest/min/vs/base/worker/workerMain.js');
+            `], { type: 'text/javascript' }));
+
+            require(["vs/editor/editor.main"], function () {
+                let botSource = localStorage.getItem('bot-source');
+                if (botSource === null) {
+                    $.get({
+                        url: "default_bot.js",
+                        success: function(data) {
+                            botSource = data;
+                        },
+                        async: false
+                    });
+                    //botSource = 'function theBot(attempt, guesses, result) {\n}\n';
+                }
+                let editor = monaco.editor.create(document.getElementById('container'), {
+                    value: botSource,
+                    language: 'javascript',
+                    theme: 'vs'
+                });
+
+                editor.getModel().onDidChangeContent((event) => {
+                    localStorage.setItem('bot-source', editor.getModel().getValue());
+                });
+
+                window.editor = editor;
+            });
+
+            (function(){
+                const oldLog = console.log;
+
+                console.forceLog = function (message) {
+                    $("#output").append($("<div>").text(message));
+                    oldLog.apply(console, arguments);
+                }
+
+                console.log = function (message) {
+                    if ($("#suppress-log").is(":checked")) {
+                        return;
+                    }
+                    console.forceLog(message);
+                };
+            })();
+
+            $("#run-game").click(function() {
+                $("#output").empty();
+                console.log("Loading bot script...");
+                const script = window.editor.getModel().getValue();
+                eval(script);
+
+                let iterations = parseInt($("#iterations").val());
+                let results = [0, 0, 0, 0, 0, 0, 0];
+                for (let game=1; game<=iterations; game++) {
+                    let attempts = runGame(make_guess);
+                    if (attempts == 7) {
+                        console.log("Finished: Bot did not guess word correctly.");
+                    } else {
+                        console.log("Finished: " + attempts + " / 6");
+                    }
+                    results[attempts - 1]++;
+                }
+
+
+                let format = n => "" + n + " (" + (n * 100 / iterations) + "%)";
+                console.forceLog("Result breakdown");
+                for (let i=0; i<6; i++) {
+                    console.forceLog("" + (i+1) + " / 6 - " + format(results[i]));
+                }
+                console.forceLog("Losses: " + format(results[6]));
+            })
+        })
+    </script>
+</html>
