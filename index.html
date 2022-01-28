@@ -38,8 +38,12 @@
     </body>
 
     <script>
+        const ALL_WORDS = PUZZLE_WORDS.concat(GUESS_WORDS);
+        ALL_WORDS.sort();
+        let ITERATIONS = 0;
+
         function runGame(guesser) {
-            const theWord = ALL_WORDS[Math.floor(Math.random() * ALL_WORDS.length)];
+            const theWord = PUZZLE_WORDS[Math.floor(Math.random() * PUZZLE_WORDS.length)];
             let result = undefined, guesses = [];
             console.log("Target word: " + theWord);
 
@@ -47,7 +51,7 @@
                 console.log("Attempt " + attempt + " of 6");
                 const guess = guesser(attempt, guesses, result).toUpperCase();
                 console.log("Guess: " + guess);
-                if (!ALL_WORDS.includes(guess) && !VALID_GUESSES.includes(guess)) {
+                if (!ALL_WORDS.includes(guess)) {
                     throw new Error("Guess was not a valid word, asking again");
                 }
 
